@@ -1,0 +1,103 @@
+from geopy.geocoders import Nominatim
+
+# 무료 지오코더
+geolocator = Nominatim(
+    user_agent="meet_planner"
+)
+
+
+# -------------------------
+# 주소 -> 좌표
+# -------------------------
+
+def get_coordinates(address):
+
+    try:
+
+        location = geolocator.geocode(
+            address
+        )
+
+        if location:
+
+            return {
+                "lat": location.latitude,
+                "lon": location.longitude
+            }
+
+    except Exception:
+
+        pass
+
+    return None
+
+
+# -------------------------
+# 여러 위치 평균 계산
+# -------------------------
+
+def calculate_midpoint(
+    locations
+):
+
+    valid = []
+
+    for loc in locations:
+
+        coord = get_coordinates(
+            loc
+        )
+
+        if coord:
+
+            valid.append(coord)
+
+    if not valid:
+
+        return None
+
+    avg_lat = sum(
+        x["lat"]
+        for x in valid
+    ) / len(valid)
+
+    avg_lon = sum(
+        x["lon"]
+        for x in valid
+    ) / len(valid)
+
+    return {
+        "lat": avg_lat,
+        "lon": avg_lon
+    }
+
+
+# -------------------------
+# 참가자 좌표 목록
+# -------------------------
+
+def get_location_markers(
+    locations
+):
+
+    markers = []
+
+    for loc in locations:
+
+        coord = get_coordinates(
+            loc
+        )
+
+        if coord:
+
+            markers.append({
+
+                "name": loc,
+
+                "lat": coord["lat"],
+
+                "lon": coord["lon"]
+
+            })
+
+    return markers
