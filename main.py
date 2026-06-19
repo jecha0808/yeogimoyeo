@@ -1,7 +1,6 @@
 import streamlit as st
-import pandas as pd
+from collections import defaultdict
 import uuid
-from scheduler import find_best_times
 
 st.set_page_config(
     page_title="Meet Planner",
@@ -9,113 +8,219 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📅 Meet Planner")
-st.caption("친구들과 약속 시간을 쉽게 찾기")
+# -----------------
+# 세션 초기화
+# -----------------
 
-if "slots" not in st.session_state:
-    st.session_state.slots = [
-        {"date": None, "start": "09:00", "end": "18:00"}
-    ]
+if "participants" not in st.session_state:
+    st.session_state.participants = []
+
+if "availability" not in st.session_state:
+    st.session_state.availability = [{}]
+
+# -----------------
+# 헤더
+# -----------------
+
+st.title("📅 Meet Planner")
+st.caption("친구들과 가장 좋은 약속 시간을 찾아보세요")
+
+# -----------------
+# 방 정보
+# -----------------
 
 with st.sidebar:
 
-    st.header("방 생성")
+    st.header("방 정보")
 
-    room_code = st.text_input(
-        "방 코드",
-        value=str(uuid.uuid4())[:8]
-    )
+    if "room_code" not in st.session_state:
+        st.session_state.room_code = str(uuid.uuid4())[:8]
 
-    st.success(
-        f"공유 코드: {room_code}"
-    )
+    st.code(st.session_state.room_code)
+
+# -----------------
+# 사용자 정보
+# -----------------
+
+st.subheader("🙋 참가자")
 
 name = st.text_input("이름")
 
-location = st.text_input(
+start_place = st.text_input(
     "출발 위치",
-    placeholder="서울역"
+    placeholder="예: 서울역"
 )
 
-st.subheader("가능 시간")
+# -----------------
+# 일정 입력
+# -----------------
 
-for i, slot in enumerate(st.session_state.slots):
+st.subheader("📅 가능한 일정")
 
-    c1, c2, c3 = st.columns(3)
+for i in range(len(st.session_state.availability)):
 
-    with c1:
-        slot["date"] = st.date_input(
-            f"날짜{i}",
-            key=f"d{i}"
-        )
+    with st.container():
 
-    with c2:
-        slot["start"] = st.text_input(
-            "시작",
-            value=slot["start"],
-            key=f"s{i}"
-        )
+        c1, c2, c3 = st.columns(3)
 
-    with c3:
-        slot["end"] = st.text_input(
-            "종료",
-            value=slot["end"],
-            key=f"e{i}"
-        )
+        with c1:
+            date = st.date_input(
+                f"날짜 {i+1}",
+                key=f"date_{i}"
+            )
+
+        with c2:
+            start = st.time_input(
+                f"시작 {i+1}",
+                key=f"start_{i}"
+            )
+
+        with c3:
+            end = st.time_input(
+                f"종료 {i+1}",
+                key=f"end_{i}"
+            )
 
 if st.button("➕ 일정 추가"):
-    st.session_state.slots.append(
-        {
-            "date": None,
-            "start": "09:00",
-            "end": "18:00"
-        }
-    )
+    st.session_state.availability.append({})
     st.rerun()
 
-if st.button("저장"):
+# -----------------
+# 저장
+# -----------------
 
-    data = {
-        "name": name,
-        "location": location,
-        "availability": st.session_state.slots
-    }
+if st.button("💾 저장"):
 
-    st.session_state.setdefault(
-        "participants",
-        []
+    schedules = []
+
+    for i in range(len(st.session_state.availability)):
+
+        schedules.append(
+            {
+                "date": str(
+                    st.session_state[f"date_{i}"]
+                ),
+                "start": str(
+                    st.session_state[f"start_{i}"]
+                ),
+                "end": str(
+                    st.session_state[f"end_{i}"]
+                )
+            }
+        )
+
+    st.session_state.participants.append(
+        {
+            "name": name,
+            "location": start_place,
+            "schedules": schedules
+        }
     )
-
-    st.session_state.participants.append(data)
 
     st.success("저장 완료")
 
-st.divider()
-
-if "participants" in st.session_state:
-
-    result = find_best_times(
-        st.session_state.participants
-    )
-
-    st.subheader("🎯 추천 시간")
-
-    for idx, r in enumerate(result[:5]):
-
-        medal = ["🥇", "🥈", "🥉", "🏅", "🏅"]
-
-        st.metric(
-            label=f"{medal[idx]} {r['date']}",
-            value=f"{r['count']}명 가능"
-        )
+# -----------------
+# 참가자 목록
+# -----------------
 
 st.divider()
 
-if "participants" in st.session_state:
+st.subheader("👥 참가자")
 
-    st.subheader("참여자")
+if not st.session_state.participants:
+
+    st.info("아직 참가자가 없습니다.")
+
+else:
 
     for p in st.session_state.participants:
-        st.write(
-            f"👤 {p['name']} - {p['location']}"
+
+        with st.expander(
+            f"{p['name']} ({p['location']})"
+        ):
+
+            for s in p["schedules"]:
+
+                st.write(
+                    f"📅 {s['date']} "
+                    f"{s['start']} ~ {s['end']}"
+                )
+
+# -----------------
+# 추천 일정
+# -----------------
+
+st.divider()
+
+st.subheader("🎯 추천 날짜")
+
+date_counter = defaultdict(int)
+
+for person in st.session_state.participants:
+
+    unique_dates = set()
+
+    for schedule in person["schedules"]:
+
+        unique_dates.add(schedule["date"])
+
+    for d in unique_dates:
+
+        date_counter[d] += 1
+
+ranking = sorted(
+    date_counter.items(),
+    key=lambda x: x[1],
+    reverse=True
+)
+
+if ranking:
+
+    medals = ["🥇", "🥈", "🥉"]
+
+    for idx, (date, count) in enumerate(ranking):
+
+        icon = (
+            medals[idx]
+            if idx < 3
+            else "🏅"
+        )
+
+        st.metric(
+            label=f"{icon} {date}",
+            value=f"{count}명 가능"
+        )
+
+else:
+
+    st.info("추천할 일정이 없습니다.")
+
+# -----------------
+# 중간 장소(임시)
+# -----------------
+
+st.divider()
+
+st.subheader("📍 만남 장소")
+
+if st.session_state.participants:
+
+    places = []
+
+    for p in st.session_state.participants:
+
+        if p["location"]:
+            places.append(p["location"])
+
+    if places:
+
+        st.write("입력된 출발지")
+
+        for place in places:
+
+            st.write("•", place)
+
+        st.warning(
+            "외부 지도 API 없이 실행 중이라 "
+            "실제 중간지점 계산은 불가능합니다."
         )
