@@ -1,8 +1,8 @@
 from openpyxl import Workbook, load_workbook
 import os
 
-ROOM_FILE = "rooms.xlsx"
-PARTICIPANT_FILE = "participants.xlsx"
+ROOM_FILE = "data/rooms.xlsx"
+PARTICIPANT_FILE = "data/participants.xlsx"
 
 
 # ---------------------------
